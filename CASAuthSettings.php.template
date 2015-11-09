@@ -52,18 +52,12 @@ $CASAuth["CreateAccounts"]=false;
 # If the "CreateAccounts" option is set "true", the string below is used as a
 # salt for generating passwords for the users.  This salt is not used by
 # the normal Mediawiki authentication and is only in place to prevent someone
-# from cracking passwords in the database.  This should be changed to something
-# long and horrendous to remember.
+# from cracking passwords in the database.  This defaults to an already-present
+# MediaWiki secure key, but for extra security, you can change it to any long
+# random string.
 #
-# Default: $CASAuth["PwdSecret"]="Secret";
-$CASAuth["PwdSecret"]="Secret";
-
-# The email domain is appended to the end of the username when the user logs
-# in.  This does not affect their email address, and is for aesthetic purposes
-# only.
-#
-# Default: $CASAuth["EmailDomain"]="example.com";
-$CASAuth["EmailDomain"]="example.com";
+# Default: $CASAuth["PwdSecret"]=$wgSecretKey;
+$CASAuth["PwdSecret"]="OtherSecret";
 
 # Restrict which users can login to the wiki?  If set to true, only the users
 # in the $CASAuth["AllowedUsers"] array can login.
@@ -95,12 +89,15 @@ function casNameLookup($username) {
   return $username;
 }
 
-# If your users aren't all on the same email domain you can
-# modify the routine below to return their email address
+# Modify the routine below to choose an appropriate method to determine a
+# user's email address.
 #
 # Default: Returns $username@EmailDomain
 function casEmailLookup($username) {
-  global $CASAuth;
-  return $username."@".$CASAuth["EmailDomain"];
+  # append organization domain
+  $mydomain = "example.com";
+  return strtr($username, "@", "")."@".$mydomain;
+  # fetch the email from CAS attributes
+  #$attributes = phpCAS::getAttributes();
+  #return $attributes['mail'];
 }
-

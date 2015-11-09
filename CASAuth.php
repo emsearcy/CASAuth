@@ -43,11 +43,10 @@ $CASAuth = array(
         "LogoutServers"  => false,
         "Port"           => 443,
         "Url"            => "/cas/",
-        "Version"        => "2.0.3-ucb",
+        "Version"        => "2.0",
         "CreateAccounts" => false,     
-        "PwdSecret"      => "Secret",
+        "PwdSecret"      => $wgSecretKey,
 
-        "EmailDomain"    => "example.com",
         "RememberMe"     => true,
         "AllowedUsers"   => false,     
         "RestrictUsers"  => false,
@@ -131,12 +130,9 @@ function casLogin($user, &$result) {
                           $u->addToDatabase();
                           $u->setRealName($username);
                           $u->setEmail($email);
-                          // PwdSecret is used to salt the username, which is
-                          // then used to create an md5 hash which becomes the
-                          // password
-                          $u->setPassword(
-                                          md5($username.$CASAuth["PwdSecret"])
-                                          );
+                          // PwdSecret is used to salt the username for an hmac
+                          // hash which becomes the password
+                          $u->setPassword(hash_hmac('sha256', $username, $CASAuth["PwdSecret"]));
  
                           $u->setToken();
                           $u->saveSettings();
@@ -199,9 +195,8 @@ function casLogout() {
                 return false;
 
         // Logout from CAS (will redirect user to CAS server)
-
         if (isset($redirecturl)) {
-                phpCAS::logoutWithRedirectService($redirecturl);
+                phpCAS::logoutWithRedirectServiceAndUrl($redirecturl, $redirecturl);
         }
         else {
                 phpCAS::logout();
