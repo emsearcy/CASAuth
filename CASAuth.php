@@ -116,6 +116,8 @@ function casLogin($user, &$result) {
                         if($CASAuth["RestrictUsers"]==true
                            && !in_array($username,$CASAuth["AllowedUsers"]))
                           {
+                            // Forget authenticated CAS user in case they attempt with another
+                            unset($_SESSION['phpCAS']);
                             // redirect user to the RestrictRedirect page
                             $wgOut->redirect($CASAuth["RestrictRedirect"]);
                             return true;
