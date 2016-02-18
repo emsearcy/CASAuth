@@ -66,10 +66,16 @@ $wgHooks["UserLogoutComplete"][] = "casLogout";
 $wgHooks["GetPreferences"][] = "casPrefs";
 
 global $wgExtensionFunctions;
+$wgExtensionFunctions[] = 'casLogoutSetup';
 $wgExtensionFunctions[] = 'casLogoutCheck';
 
-global $casIsSetUp;
-$casIsSetUp = false;
+// Set up CAS immediately to process single sign-out messages
+function casLogoutSetup() {
+        // Only set up CAS at system init on POSTs to not break lazy sessions
+        if (isset($_SERVER['REQUEST_METHOD']) && $_SERVER['REQUEST_METHOD'] == 'POST') {
+                casSetup();
+        }
+}
 
 // Check if there was a valid single sign-out message that terminated this session
 function casLogoutCheck() {
@@ -87,7 +93,6 @@ function casLogoutCheck() {
 // Login
 function casLogin($user, &$result) {
         global $CASAuth;
-        global $casIsSetUp;
         global $IP, $wgLanguageCode, $wgRequest, $wgOut;
 
         if (isset($_REQUEST["title"])) {
@@ -98,14 +103,11 @@ function casLogin($user, &$result) {
                         // Setup for a web request
                         require_once("$IP/includes/WebStart.php");
 
-                        // Load phpCAS
-                        require_once($CASAuth["phpCAS"]."/CAS.php");
-                        if(!$casIsSetUp)
-                                return false;
+                        // Set up CAS if needed
+                        casSetup();
 
                         //Will redirect to CAS server if not logged in
                         phpCAS::forceAuthentication();
-
 
                         // Get username
                         $username = casNameLookup(phpCAS::getUser());
@@ -174,11 +176,10 @@ function casLogin($user, &$result) {
 
 // Logout
 function casLogout() {
-        global $CASAuth;
-        global $casIsSetUp;
         global $wgUser, $wgRequest, $wgLanguageCode;
 
-        require_once($CASAuth["phpCAS"]."/CAS.php");
+        // Set up CAS if needed
+        casSetup();
 
         // Logout from MediaWiki
         $wgUser->logout();
@@ -192,9 +193,6 @@ function casLogout() {
                         $redirecturl = $target->getFullUrl();
                 }
         }
-
-        if(!$casIsSetUp)
-                return false;
 
         // Logout from CAS (will redirect user to CAS server)
         if (isset($redirecturl)) {
@@ -249,11 +247,6 @@ function casPostAuth($ticket2logout) {
 
 // The CAS server sent a single sign-out command... let's process it
 function casSingleSignOut($ticket2logout) {
-        global $CASAuth;
-        global $IP;
-
-        require_once($CASAuth["phpCAS"]."/CAS.php");
-
         $session_id = preg_replace('/[^\w]/','',$ticket2logout);
 
         // destroy a possible application session created before phpcas
@@ -291,9 +284,17 @@ function casSingleSignOut($ticket2logout) {
 
 function casSetup() {
         global $CASAuth;
-        global $casIsSetUp;
 
-        require_once($CASAuth["phpCAS"]."/CAS.php");
+        if (!defined('PHPCAS_VERSION') || !class_exists('phpCAS')) {
+                require_once($CASAuth["phpCAS"]."/CAS.php");
+        }
+
+        static $casIsSetUp = false;
+        if ($casIsSetUp) {
+                // phpCAS cannot be initialized twice.
+                return;
+        }
+
         phpCAS::client($CASAuth["Version"], $CASAuth["Server"], $CASAuth["Port"], $CASAuth["Url"], false);
         phpCAS::setSingleSignoutCallback('casSingleSignOut');
         phpCAS::setPostAuthenticateCallback('casPostAuth');
